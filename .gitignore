@@ -1,0 +1,14 @@
+# Backend Ignores (TREGO_PACKS)
+TREGO_PACKS/venv/
+TREGO_PACKS/__pycache__/
+TREGO_PACKS/*.pyc
+TREGO_PACKS/.env
+TREGO_PACKS/media/
+TREGO_PACKS/static/
+TREGO_PACKS/db.sqlite3
+
+# Frontend Ignores (trego-frontend)
+trego-frontend/node_modules/
+trego-frontend/build/
+trego-frontend/.env.local
+trego-frontend/.env*.local
