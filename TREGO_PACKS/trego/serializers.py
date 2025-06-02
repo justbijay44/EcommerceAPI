@@ -39,6 +39,10 @@ class CartSerializer(serializers.ModelSerializer):
     class Meta:
         model = Cart
         fields = ['id', 'user', 'product', 'product_id', 'quantity', 'added_at']
+        extra_kwargs = {
+            'user': {'required': False, 'read_only': True},
+            'added_at': {'read_only': True}
+        }
 
 class OrderSerializer(serializers.ModelSerializer):
     product = ProductSerializer(read_only=True)
