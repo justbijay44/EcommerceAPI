@@ -1,11 +1,12 @@
-
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import Login from './Login';
 import Navbar from './Navbar';
 import Cart from './Cart';
-import Home from './Home'; 
+import Home from './Home';
 import OrderHistory from './OrderHistory';
+import Feedback from './Feedback';
+import ProductDetails from './ProductDetails';
 import { getProducts, setAuthToken, getToken, addToCart } from './api/api';
 
 function AppContent() {
@@ -18,36 +19,18 @@ function AppContent() {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('No token found');
-      setAuthToken(token);
-      console.log('Fetching products with token:', token);
+      setError(null); // Clear previous errors
       const data = await getProducts();
-      console.log('Fetched products:', data);
       setProducts(data);
       setLoading(false);
     } catch (err) {
       console.error('Fetch products failed:', err.message);
-      if (err.response?.status === 401) {
-        try {
-          const newToken = await getToken('admin', 'admin123');
-          setAuthToken(newToken);
-          localStorage.setItem('token', newToken);
-          const data = await getProducts();
-          console.log('Fetched products after token refresh:', data);
-          setProducts(data);
-          setLoading(false);
-        } catch (refreshErr) {
-          setError('Session expired. Please log in again.');
-          setIsLoggedIn(false);
-          localStorage.removeItem('token');
-          setAuthToken(null);
-          navigate('/');
-        }
-      } else {
-        setError(`Cannot load products: ${err.message}`);
-        setLoading(false);
-      }
+      setError('Failed to load products. Please log in again.');
+      setIsLoggedIn(false);
+      localStorage.removeItem('token');
+      setAuthToken(null);
+      setTimeout(() => navigate('/'), 2000);
+      setLoading(false);
     }
   };
 
@@ -57,8 +40,10 @@ function AppContent() {
       setAuthToken(token);
       localStorage.setItem('token', token);
       setIsLoggedIn(true);
+      setError(null);
+      await fetchProducts();
     } catch (err) {
-      setError('Login failed');
+      setError('Login failed. Please check your credentials.');
     }
   };
 
@@ -67,11 +52,11 @@ function AppContent() {
     setAuthToken(null);
     setIsLoggedIn(false);
     setProducts([]);
+    navigate('/');
   };
 
   const handleAddToCart = async (productId) => {
     try {
-      console.log('Adding to cart, Product ID:', productId);
       const response = await addToCart(productId, 1);
       console.log('Add to cart response:', response);
     } catch (err) {
@@ -80,16 +65,16 @@ function AppContent() {
   };
 
   useEffect(() => {
-    if (isLoggedIn) {
+    const token = localStorage.getItem('token');
+    if (token) {
+      setAuthToken(token);
+      setIsLoggedIn(true);
       fetchProducts();
-    }
-  }, [isLoggedIn]);
-
-  useEffect(() => {
-    if (!isLoggedIn && !localStorage.getItem('token')) {
+    } else {
+      setIsLoggedIn(false);
       navigate('/');
     }
-  }, [isLoggedIn, navigate]);
+  }, []); // Run once on mount
 
   return (
     <Routes>
@@ -107,7 +92,7 @@ function AppContent() {
               />
             </>
           ) : (
-            <Login onLogin={handleLogin} />
+            <Login onLogin={handleLogin} error={error} />
           )
         }
       />
@@ -120,7 +105,7 @@ function AppContent() {
               <Cart />
             </>
           ) : (
-            <Login onLogin={handleLogin} />
+            <Login onLogin={handleLogin} error={error} />
           )
         }
       />
@@ -133,7 +118,46 @@ function AppContent() {
               <OrderHistory />
             </>
           ) : (
-            <Login onLogin={handleLogin} />
+            <Login onLogin={handleLogin} error={error} />
+          )
+        }
+      />
+      <Route
+        path="/payment/:orderId"
+        element={
+          isLoggedIn ? (
+            <>
+              <Navbar onLogout={handleLogout} />
+              <Cart />
+            </>
+          ) : (
+            <Login onLogin={handleLogin} error={error} />
+          )
+        }
+      />
+      <Route
+        path="/feedback"
+        element={
+          isLoggedIn ? (
+            <>
+              <Navbar onLogout={handleLogout} />
+              <Feedback />
+            </>
+          ) : (
+            <Login onLogin={handleLogin} error={error} />
+          )
+        }
+      />
+      <Route
+        path="/product/:productId"
+        element={
+          isLoggedIn ? (
+            <>
+              <Navbar onLogout={handleLogout} />
+              <ProductDetails />
+            </>
+          ) : (
+            <Login onLogin={handleLogin} error={error} />
           )
         }
       />

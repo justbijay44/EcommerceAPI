@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from django.contrib.auth.models import User
 
-from .models import Profile, Category, Product, Cart, Order
+from .models import Profile, Category, Product, Cart, Order,Feedback
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -51,3 +51,8 @@ class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = ['id', 'user', 'product', 'product_id', 'quantity', 'status', 'created_at']
+
+class FeedbackSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Feedback
+        fields = ['id', 'rating', 'comment', 'created_at']

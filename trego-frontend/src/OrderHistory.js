@@ -1,50 +1,60 @@
-import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { getOrderHistory, setAuthToken, getToken } from "./api/api";
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { getOrderHistory, setAuthToken, getToken } from './api/api';
 
 function OrderHistory() {
-  const [orders, setOrders] = React.useState([]);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState(null);
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const fetchOrderHistory = async () => {
+  const fetchOrderHistory = useCallback(async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("token");
-      if (!token) throw new Error("No token found");
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No token found');
       setAuthToken(token);
-      console.log("Fetching order history with token:", token);
+      console.log('Fetching order history with token:', token);
       const data = await getOrderHistory();
-      console.log("Fetched order history:", data);
+      console.log('Fetched order history:', data);
       setOrders(data);
       setLoading(false);
     } catch (err) {
-      console.error("Fetch order history failed:", err.message);
+      console.error('Fetch order history failed:', err.message);
       if (err.response?.status === 401) {
         try {
-          const newToken = await getToken("admin", "admin123");
+          const newToken = await getToken('admin', 'admin123');
           setAuthToken(newToken);
-          localStorage.setItem("token", newToken);
+          localStorage.setItem('token', newToken);
           const data = await getOrderHistory();
           setOrders(data);
           setLoading(false);
         } catch (refreshErr) {
-          setError("Session expired. Please log in again.");
-          localStorage.removeItem("token");
+          setError('Session expired. Please log in again.');
+          localStorage.removeItem('token');
           setAuthToken(null);
-          setTimeout(() => navigate("/"), 2000); // Redirect to login after 2 seconds
+          setTimeout(() => navigate('/'), 2000);
         }
       } else {
-        setError("Failed to load order history");
+        setError('Failed to load order history');
         setLoading(false);
       }
     }
-  };
+  }, [navigate]);
 
   useEffect(() => {
     fetchOrderHistory();
-  }, []);
+  }, [location.pathname, fetchOrderHistory]);
+
+  // Add polling to refresh order status
+  useEffect(() => {
+    const pollInterval = setInterval(() => {
+      fetchOrderHistory();
+    }, 5000); // Poll every 5 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [fetchOrderHistory]);
 
   if (loading) return <div className="text-center text-2xl text-white">Loading...</div>;
   if (error) return <div className="text-center text-red-400">{error}</div>;
@@ -59,10 +69,7 @@ function OrderHistory() {
       ) : (
         <div className="space-y-4">
           {orders.map((order) => (
-            <div
-              key={order.id}
-              className="card"
-            >
+            <div key={order.id} className="card">
               <h2 className="text-lg font-semibold text-white">Order #{order.id}</h2>
               <p className="text-sm text-gray-300">Date: {new Date(order.created_at).toLocaleString()}</p>
               <p className="text-sm text-gray-300">Product: {order.product.name}</p>

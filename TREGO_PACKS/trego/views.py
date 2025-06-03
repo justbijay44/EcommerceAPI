@@ -5,10 +5,13 @@ from rest_framework import status
 from rest_framework.decorators import action
 
 from .serializers import (ProfileSerializer, CategorySerializer,
-                           ProductSerializer, CartSerializer, OrderSerializer)
+                           ProductSerializer, CartSerializer, OrderSerializer, FeedbackSerializer)
 
-from .models import Category, Product, Profile, Cart, Order
+from .models import Category, Product, Profile, Cart, Order, Feedback
 from django.db import transaction
+
+import random
+import time
 
 class IsAdmin(BasePermission):
     def has_permission(self, request, view):
@@ -118,11 +121,11 @@ class OrderViewSet(viewsets.ModelViewSet):
     def checkout(self, request):
         try:
             with transaction.atomic():
-                cart_item = Cart.objects.filter(user=request.user)
-                if not cart_item.exists():
+                cart_items = Cart.objects.filter(user=request.user)
+                if not cart_items.exists():
                     return Response({"error": "Cart is empty"}, status=status.HTTP_400_BAD_REQUEST)
                 
-                for cart in cart_item:
+                for cart in cart_items:
                     # Create order for each cart item
                     Order.objects.create(
                         user=request.user,
@@ -130,9 +133,9 @@ class OrderViewSet(viewsets.ModelViewSet):
                         quantity=cart.quantity,
                         status='pending'
                     )
-                    # Remove item from cart after order creation
-                cart.delete()
-                return Response({"message": "Checkout successful"}, status=status.HTTP_201_CREATED)
+                # Remove all cart items after order creation
+                cart_items.delete()  # Fixed from cart.delete()
+                return Response({"message": "Order placed successfully, proceed to payment"}, status=status.HTTP_201_CREATED)
         except Exception as e:
             print(f"Error in OrderViewSet.checkout: {str(e)}")
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -146,3 +149,55 @@ class OrderViewSet(viewsets.ModelViewSet):
         except Exception as e:
             print(f"Error in OrderViewSet.order_history: {str(e)}")
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+    @action(detail=True, methods=['post'], url_path='process-payment')
+    def process_payment(self, request, pk=None):
+        try:
+            print(f"User: {request.user.username}, Is admin: {request.user.profile.user_type == 'admin'}")
+            order = self.get_object()
+            print(f"Before payment - Order {order.id} status: {order.status}, Owner: {order.user.username}")
+            
+            # Simulate network delay
+            time.sleep(1)
+            
+            # Forced success for testing
+            payment_success = True
+            print(f"Payment success: {payment_success}")
+            
+            if payment_success:
+                try:
+                    # Update order status
+                    order.status = 'shipped'
+                    order.save(update_fields=['status'])
+                    
+                    # Verify the update
+                    order.refresh_from_db()
+                    print(f"After save - Order {order.id} status: {order.status}")
+                    
+                    if order.status != 'shipped':
+                        raise Exception(f"Status update failed for Order {order.id}, still {order.status}")
+                    
+                    return Response({"message": "Payment successful, order shipped"}, status=status.HTTP_200_OK)
+                except Exception as save_error:
+                    print(f"Save error for Order {order.id}: {str(save_error)}")
+                    return Response({"error": "Failed to update order status"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            else:
+                print(f"Payment failed for Order {order.id}")
+                return Response({"error": "Payment failed, please try again"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            print(f"Error in OrderViewSet.process_payment: {str(e)}")
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+class FeedbackViewSet(viewsets.ModelViewSet):
+    queryset = Feedback.objects.all()
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            self.perform_create(serializer)
+            return Response({"message": "Feedback submitted successfully"}, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
